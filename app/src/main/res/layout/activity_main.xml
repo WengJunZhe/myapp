@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+    <LinearLayout
+        android:id="@+id/main"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+        <Button
+            android:id="@+id/btnLoadResource"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Load Image from res/raw" />
+        <Button
+            android:id="@+id/btnPythonReadImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Python Read Local Image" />
+        <Button
+            android:id="@+id/btnPickImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pick Image from Device" />
+        <Button
+            android:id="@+id/btnProcessImage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Process Image Test" />
+        <TextView
+            android:id="@+id/txtStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:text="Status"
+            android:textSize="16sp" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Original Image"
+            android:textStyle="bold" />
+        <ImageView
+            android:id="@+id/imgOriginal"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginBottom="8dp"
+            android:adjustViewBounds="true"
+            android:background="#EEEEEE"
+            android:scaleType="fitCenter" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Result Image"
+            android:textStyle="bold" />
+        <ImageView
+            android:id="@+id/imgResult"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:adjustViewBounds="true"
+            android:background="#EEEEEE"
+            android:scaleType="fitCenter" />
+    </LinearLayout>
+</ScrollView>
