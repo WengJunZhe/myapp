@@ -3,7 +3,8 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#000000">
 
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
@@ -12,28 +13,210 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/processBtn" />
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel" />
 
     <ImageView
         android:id="@+id/resultView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:adjustViewBounds="true"
         android:scaleType="fitCenter"
-        android:visibility="gone"
+        android:visibility="visible"
         app:layout_constraintTop_toTopOf="@id/previewView"
         app:layout_constraintBottom_toBottomOf="@id/previewView"
         app:layout_constraintStart_toStartOf="@id/previewView"
         app:layout_constraintEnd_toEndOf="@id/previewView" />
 
-    <Button
-        android:id="@+id/processBtn"
+    <!-- 左上角面提示卡片 -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/hintCard"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Process"
-        android:layout_marginBottom="24dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_margin="12dp"
+        app:cardBackgroundColor="#CC000000"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="6dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tvFaceName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="按下「開始掃描」"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp" />
+
+            <LinearLayout
+                android:id="@+id/progressDots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:gravity="center">
+
+                <View android:id="@+id/dot0"
+                    android:layout_width="10dp" android:layout_height="10dp"
+                    android:layout_margin="3dp"
+                    android:background="@drawable/dot_inactive" />
+                <View android:id="@+id/dot1"
+                    android:layout_width="10dp" android:layout_height="10dp"
+                    android:layout_margin="3dp"
+                    android:background="@drawable/dot_inactive" />
+                <View android:id="@+id/dot2"
+                    android:layout_width="10dp" android:layout_height="10dp"
+                    android:layout_margin="3dp"
+                    android:background="@drawable/dot_inactive" />
+                <View android:id="@+id/dot3"
+                    android:layout_width="10dp" android:layout_height="10dp"
+                    android:layout_margin="3dp"
+                    android:background="@drawable/dot_inactive" />
+                <View android:id="@+id/dot4"
+                    android:layout_width="10dp" android:layout_height="10dp"
+                    android:layout_margin="3dp"
+                    android:background="@drawable/dot_inactive" />
+                <View android:id="@+id/dot5"
+                    android:layout_width="10dp" android:layout_height="10dp"
+                    android:layout_margin="3dp"
+                    android:background="@drawable/dot_inactive" />
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- 信心度進度條 -->
+    <ProgressBar
+        android:id="@+id/confidenceBar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="0dp"
+        android:layout_height="8dp"
+        android:layout_margin="12dp"
+        android:progress="0"
+        android:max="100"
+        android:progressTint="#4CAF50"
+        android:progressBackgroundTint="#444444"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 底部按鈕 -->
+    <LinearLayout
+        android:id="@+id/bottomPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#CC111111"
+        android:padding="12dp"
+        android:gravity="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:layout_margin="6dp"
+            android:text="▶  開始掃描"
+            android:textSize="15sp"
+            android:backgroundTint="#2196F3"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btnConfirm"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:layout_margin="6dp"
+            android:text="✔  確認此面"
+            android:textSize="15sp"
+            android:backgroundTint="#4CAF50"
+            android:textColor="#FFFFFF"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btnRescan"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:layout_margin="6dp"
+            android:text="↺  重掃"
+            android:textSize="15sp"
+            android:backgroundTint="#FF5722"
+            android:textColor="#FFFFFF"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- 解法結果面板 -->
+    <ScrollView
+        android:id="@+id/solutionPanel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:background="#EE000000"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomPanel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🧩  最快解法"
+                android:textColor="#FFFFFF"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:id="@+id/tvSolution"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#76FF03"
+                android:textSize="18sp"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:lineSpacingExtra="6dp"
+                android:padding="16dp"
+                android:background="#22FFFFFF" />
+
+            <TextView
+                android:id="@+id/tvMoveCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#AAAAAA"
+                android:textSize="14sp"
+                android:layout_marginTop="12dp" />
+
+            <Button
+                android:id="@+id/btnRestart"
+                android:layout_width="wrap_content"
+                android:layout_height="52dp"
+                android:layout_marginTop="32dp"
+                android:paddingHorizontal="32dp"
+                android:text="重新掃描"
+                android:textSize="16sp"
+                android:backgroundTint="#2196F3"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+    </ScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -11,12 +11,15 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
@@ -24,6 +27,7 @@ import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
+import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 
 import com.chaquo.python.PyObject;
@@ -33,27 +37,51 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
 
-    private Python py;
+    private static final String TAG = "CubeSolver";
+
+    private static final String[] FACE_KEYS  = {"U", "R", "F", "D", "L", "B"};
+    private static final String[] FACE_NAMES = {
+            "白色面 (U·上)", "紅色面 (R·右)", "綠色面 (F·前)",
+            "黃色面 (D·下)", "橙色面 (L·左)", "藍色面 (B·後)"
+    };
+
+    private enum ScanState { IDLE, SCANNING, DONE }
+    private ScanState state = ScanState.IDLE;
+    private int currentFaceIndex = 0;
+
+    private final Map<String, String> confirmedFaces = new HashMap<>();
+    private String currentColors9    = null;
+    private float  currentConfidence = 0f;
+
+    // UI
     private PreviewView previewView;
-    private ImageView resultView;
+    private ImageView   resultView;
+    private TextView    tvFaceName, tvSolution, tvMoveCount;
+    private ProgressBar confidenceBar;
+    private Button      btnStart, btnConfirm, btnRescan, btnRestart;
+    private CardView    hintCard;
+    private ScrollView  solutionPanel;
+    private View[]      dots;
 
-    private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
-
-    // 改動 1：預設直接開啟自動模式
-    private boolean isProcessing = false;
+    // Camera / Python
+    private Python   py;
+    private PyObject pyModule;
+    private ProcessCameraProvider cameraProvider;
+    private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean isProcessing = false;
 
     private final ActivityResultLauncher<String> cameraPermLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-                if (isGranted) {
-                    startCamera();
-                } else {
-                    Toast.makeText(this, "需要攝影機權限", Toast.LENGTH_LONG).show();
-                }
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                if (granted) startCamera();
+                else Toast.makeText(this, "需要攝影機權限", Toast.LENGTH_LONG).show();
             });
 
     @Override
@@ -61,16 +89,34 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        previewView = findViewById(R.id.previewView);
-        resultView = findViewById(R.id.resultView);
+        previewView   = findViewById(R.id.previewView);
+        resultView    = findViewById(R.id.resultView);
+        tvFaceName    = findViewById(R.id.tvFaceName);
+        tvSolution    = findViewById(R.id.tvSolution);
+        tvMoveCount   = findViewById(R.id.tvMoveCount);
+        confidenceBar = findViewById(R.id.confidenceBar);
+        btnStart      = findViewById(R.id.btnStart);
+        btnConfirm    = findViewById(R.id.btnConfirm);
+        btnRescan     = findViewById(R.id.btnRescan);
+        btnRestart    = findViewById(R.id.btnRestart);
+        hintCard      = findViewById(R.id.hintCard);
+        solutionPanel = findViewById(R.id.solutionPanel);
+        dots = new View[]{
+                findViewById(R.id.dot0), findViewById(R.id.dot1),
+                findViewById(R.id.dot2), findViewById(R.id.dot3),
+                findViewById(R.id.dot4), findViewById(R.id.dot5)
+        };
 
-        // 確保結果圖層一開始就顯示出來，用來覆蓋預覽畫面或並排
-        resultView.setVisibility(View.VISIBLE);
+        setIdleUI();
 
-        if (!Python.isStarted()) {
-            Python.start(new AndroidPlatform(this));
-        }
-        py = Python.getInstance();
+        btnStart.setOnClickListener(v -> beginScan());
+        btnConfirm.setOnClickListener(v -> confirmCurrentFace());
+        btnRescan.setOnClickListener(v -> rescanCurrentFace());
+        btnRestart.setOnClickListener(v -> resetAll());
+
+        if (!Python.isStarted()) Python.start(new AndroidPlatform(this));
+        py       = Python.getInstance();
+        pyModule = py.getModule("opencv_process");
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -80,109 +126,264 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void startCamera() {
-        ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(this);
+    // ── UI 狀態 ───────────────────────────────────────────────
 
-        future.addListener(() -> {
+    private void setIdleUI() {
+        btnStart.setVisibility(View.VISIBLE);
+        btnConfirm.setVisibility(View.GONE);
+        btnRescan.setVisibility(View.GONE);
+        solutionPanel.setVisibility(View.GONE);
+        hintCard.setVisibility(View.VISIBLE);
+        confidenceBar.setVisibility(View.VISIBLE);
+        tvFaceName.setText("按下「開始掃描」\n開始辨識魔術方塊");
+        confidenceBar.setProgress(0);
+        resetDots();
+    }
+
+    private void setScanningUI(int faceIndex) {
+        btnStart.setVisibility(View.GONE);
+        btnConfirm.setVisibility(View.VISIBLE);
+        btnRescan.setVisibility(View.VISIBLE);
+        solutionPanel.setVisibility(View.GONE);
+        hintCard.setVisibility(View.VISIBLE);
+        confidenceBar.setVisibility(View.VISIBLE);
+        tvFaceName.setText("第 " + (faceIndex + 1) + "/6 面\n" + FACE_NAMES[faceIndex]);
+    }
+
+    private void setResultUI(String solution, int moves) {
+        solutionPanel.setVisibility(View.VISIBLE);
+        hintCard.setVisibility(View.GONE);
+        btnStart.setVisibility(View.GONE);
+        btnConfirm.setVisibility(View.GONE);
+        btnRescan.setVisibility(View.GONE);
+        confidenceBar.setVisibility(View.GONE);
+
+        String[] steps = solution.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < steps.length; i++) {
+            sb.append(steps[i]);
+            if ((i + 1) % 5 == 0 && i != steps.length - 1) sb.append("\n");
+            else if (i != steps.length - 1) sb.append("  ");
+        }
+        tvSolution.setText(sb.toString());
+        tvMoveCount.setText("共 " + moves + " 步");
+    }
+
+    private void resetDots() {
+        for (View dot : dots) dot.setBackgroundResource(R.drawable.dot_inactive);
+    }
+
+    private void markDotDone(int index) {
+        if (index >= 0 && index < dots.length)
+            dots[index].setBackgroundResource(R.drawable.dot_active);
+    }
+
+    // ── 掃描流程 ──────────────────────────────────────────────
+
+    private void beginScan() {
+        confirmedFaces.clear();
+        currentFaceIndex  = 0;
+        currentColors9    = null;
+        currentConfidence = 0f;
+        state = ScanState.SCANNING;
+        resetDots();
+        setScanningUI(0);
+        Toast.makeText(this, "將 " + FACE_NAMES[0] + " 對準框內", Toast.LENGTH_SHORT).show();
+    }
+
+    private void confirmCurrentFace() {
+        if (currentColors9 == null) {
+            Toast.makeText(this, "尚未偵測到方塊，請重新對準", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (currentConfidence < 0.6f) {
+            Toast.makeText(this,
+                    String.format("信心度不足 (%.0f%%)，請調整角度", currentConfidence * 100),
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        confirmedFaces.put(FACE_KEYS[currentFaceIndex], currentColors9);
+        markDotDone(currentFaceIndex);
+        currentFaceIndex++;
+        currentColors9    = null;
+        currentConfidence = 0f;
+        runOnUiThread(() -> confidenceBar.setProgress(0));
+
+        if (currentFaceIndex >= 6) {
+            state = ScanState.DONE;
+            stopCameraAnalysis();
+            solveCube();
+        } else {
+            setScanningUI(currentFaceIndex);
+            Toast.makeText(this, "請翻到 " + FACE_NAMES[currentFaceIndex], Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void rescanCurrentFace() {
+        currentColors9    = null;
+        currentConfidence = 0f;
+        runOnUiThread(() -> confidenceBar.setProgress(0));
+        Toast.makeText(this, "重新對準 " + FACE_NAMES[currentFaceIndex], Toast.LENGTH_SHORT).show();
+    }
+
+    private void resetAll() {
+        confirmedFaces.clear();
+        currentFaceIndex  = 0;
+        currentColors9    = null;
+        currentConfidence = 0f;
+        state = ScanState.IDLE;
+        setIdleUI();
+        startCamera();
+    }
+
+    // ── Kociemba 求解 ─────────────────────────────────────────
+
+    private void solveCube() {
+        tvSolution.setText("計算中…");
+        tvMoveCount.setText("");
+        solutionPanel.setVisibility(View.VISIBLE);
+        hintCard.setVisibility(View.GONE);
+        btnStart.setVisibility(View.GONE);
+        btnConfirm.setVisibility(View.GONE);
+        btnRescan.setVisibility(View.GONE);
+        confidenceBar.setVisibility(View.GONE);
+
+        new Thread(() -> {
             try {
-                ProcessCameraProvider cameraProvider = future.get();
+                PyObject result = pyModule.callAttr("solve_cube", confirmedFaces);
+                List<PyObject> items = result.asList();
+                String solution = items.get(0).toString();
+                String errorMsg = items.get(1).toString();
 
-                Preview preview = new Preview.Builder().build();
-                preview.setSurfaceProvider(previewView.getSurfaceProvider());
-
-                // 改動 2：設定 Analysis 解析度（建議不要太高，否則 Python 處理會太慢）
-                ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
-                        .setTargetResolution(new Size(480, 640))
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build();
-
-                // 自動連續分析邏輯
-                imageAnalysis.setAnalyzer(cameraExecutor, image -> {
-                    Log.d("CameraX", "Analysis start");
-                    // 如果上一幀還在 Python 裡面跑，這一幀就直接丟掉，避免記憶體塞爆
-                    if (isProcessing) {
-                        image.close();
-                        return;
-                    }
-
-                    isProcessing = true; // 上鎖
-
-                    try {
-                        byte[] bytes = yuvToJpegBytes(image);
-                        image.close(); // 轉換完立即釋放相機幀
-
-                        if (bytes == null) {
-                            isProcessing = false;
-                            return;
-                        }
-
-                        // 直接呼叫 Python 處理
-                        PyObject module = py.getModule("opencv_process");
-                        PyObject result = module.callAttr("canny_from_image_bytes", bytes);
-                        byte[] outPng = result.toJava(byte[].class);
-                        Bitmap bitmap = BitmapFactory.decodeByteArray(outPng, 0, outPng.length);
-
-                        // 更新到 UI
-                        runOnUiThread(() -> {
-                            if (bitmap != null) {
-                                resultView.setImageBitmap(bitmap);
-                            }
-                            isProcessing = false; // 處理完顯示出來後，才解鎖接下一幀
-                        });
-                    } catch (Exception e) {
-                        Log.e("Python", "Error processing image", e);
-                        isProcessing = false;
-                        image.close();
+                runOnUiThread(() -> {
+                    if (!errorMsg.isEmpty()) {
+                        tvSolution.setText("解法錯誤：\n" + errorMsg);
+                        tvMoveCount.setText("請確認六面顏色是否正確");
+                    } else {
+                        int moves = solution.trim().isEmpty() ? 0
+                                : solution.trim().split("\\s+").length;
+                        setResultUI(solution, moves);
                     }
                 });
-
-                CameraSelector selector = CameraSelector.DEFAULT_BACK_CAMERA;
-                cameraProvider.unbindAll();
-                // 綁定分析器與預覽
-                cameraProvider.bindToLifecycle(this, selector, preview, imageAnalysis);
-
             } catch (Exception e) {
-                Log.e("CameraX", "Failed", e);
+                Log.e(TAG, "Solve error", e);
+                runOnUiThread(() -> tvSolution.setText("求解失敗：\n" + e.getMessage()));
+            }
+        }).start();
+    }
+
+    // ── CameraX ──────────────────────────────────────────────
+
+    private void startCamera() {
+        ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(this);
+        future.addListener(() -> {
+            try {
+                cameraProvider = future.get();
+                bindCamera();
+            } catch (Exception e) {
+                Log.e(TAG, "Camera init failed", e);
             }
         }, ContextCompat.getMainExecutor(this));
     }
 
-    // 將 YUV 轉 JPEG 的標準工具函式
+    private void bindCamera() {
+        if (cameraProvider == null) return;
+        cameraProvider.unbindAll();
+
+        Preview preview = new Preview.Builder().build();
+        preview.setSurfaceProvider(previewView.getSurfaceProvider());
+
+        ImageAnalysis analysis = new ImageAnalysis.Builder()
+                .setTargetResolution(new Size(480, 640))
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build();
+
+        analysis.setAnalyzer(cameraExecutor, image -> {
+            if (isProcessing || state != ScanState.SCANNING) {
+                image.close();
+                return;
+            }
+            isProcessing = true;
+            try {
+                byte[] bytes = yuvToJpegBytes(image);
+                image.close();
+                if (bytes == null) { isProcessing = false; return; }
+
+                PyObject pyResult = pyModule.callAttr("detect_cube_face", (Object) bytes);
+                List<PyObject> items = pyResult.asList();
+
+                byte[]   pngBytes  = items.get(0).toJava(byte[].class);
+                PyObject pyColors  = items.get(1);
+                float    confidence = items.get(2).toJava(Float.class);
+
+                String colors9 = null;
+                if (pyColors != null && !pyColors.toString().equals("None")) {
+                    StringBuilder sb = new StringBuilder();
+                    for (PyObject c : pyColors.asList()) sb.append(c.toString());
+                    colors9 = sb.toString();
+                }
+
+                final Bitmap bmp        = BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.length);
+                final String finalColors = colors9;
+                final float  finalConf   = confidence;
+
+                runOnUiThread(() -> {
+                    if (bmp != null) resultView.setImageBitmap(bmp);
+                    if (finalColors != null) {
+                        currentColors9    = finalColors;
+                        currentConfidence = finalConf;
+                        confidenceBar.setProgress((int)(finalConf * 100));
+                    }
+                    isProcessing = false;
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Frame processing error", e);
+                isProcessing = false;
+                image.close();
+            }
+        });
+
+        cameraProvider.bindToLifecycle(this,
+                CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
+    }
+
+    private void stopCameraAnalysis() {
+        if (cameraProvider != null) cameraProvider.unbindAll();
+    }
+
+    // ── YUV → JPEG ───────────────────────────────────────────
+
     private byte[] yuvToJpegBytes(ImageProxy image) {
-        int width = image.getWidth();
-        int height = image.getHeight();
+        int w = image.getWidth(), h = image.getHeight();
         ImageProxy.PlaneProxy[] planes = image.getPlanes();
-        
-        // 將 YUV_420_888 轉換為 NV21
-        ByteBuffer yBuffer = planes[0].getBuffer();
-        ByteBuffer uBuffer = planes[1].getBuffer();
-        ByteBuffer vBuffer = planes[2].getBuffer();
 
-        int ySize = yBuffer.remaining();
-        int uSize = uBuffer.remaining();
-        int vSize = vBuffer.remaining();
+        ByteBuffer yBuf = planes[0].getBuffer();
+        ByteBuffer uBuf = planes[1].getBuffer();
+        ByteBuffer vBuf = planes[2].getBuffer();
 
-        byte[] nv21 = new byte[width * height * 3 / 2];
-        
-        // Y 通道
-        yBuffer.get(nv21, 0, ySize);
-        
-        // UV 通道 (NV21 格式是 V, U, V, U...)
-        // 注意：在很多 Android 裝置上，U 和 V 平面可能是交錯的
-        int pixelStride = planes[1].getPixelStride();
-        if (pixelStride == 2) {
-            // 如果是交錯的 (common case)，直接從 V 平面讀取即可
-            vBuffer.get(nv21, ySize, vSize);
+        int ySize = yBuf.remaining();
+        int vSize = vBuf.remaining();
+        byte[] nv21 = new byte[w * h * 3 / 2];
+        yBuf.get(nv21, 0, ySize);
+
+        if (planes[1].getPixelStride() == 2) {
+            vBuf.get(nv21, ySize, vSize);
         } else {
-            // 如果不是交錯的，需要手動填入
-            // 此處省略更複雜的處理，通常 pixelStride 為 2
-            vBuffer.get(nv21, ySize, vSize);
-            // 注意：這裡的處理並不完美，但在許多情況下能運作
+            byte[] uArr = new byte[uBuf.remaining()];
+            byte[] vArr = new byte[vBuf.remaining()];
+            uBuf.get(uArr);
+            vBuf.get(vArr);
+            int uvLen = Math.min(uArr.length, vArr.length);
+            for (int i = 0; i < uvLen && ySize + i * 2 + 1 < nv21.length; i++) {
+                nv21[ySize + i * 2]     = vArr[i];
+                nv21[ySize + i * 2 + 1] = uArr[i];
+            }
         }
 
-        YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, width, height, null);
+        YuvImage yuvImg = new YuvImage(nv21, ImageFormat.NV21, w, h, null);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        yuvImage.compressToJpeg(new Rect(0, 0, width, height), 70, out);
+        yuvImg.compressToJpeg(new Rect(0, 0, w, h), 75, out);
         return out.toByteArray();
     }
 
