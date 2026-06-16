@@ -60,11 +60,9 @@ chaquopy {
         version "3.10"
         pip {
             install "numpy"
-            install "chaquopy-libjpeg"
-            install "chaquopy-libpng"
             install "opencv-python-headless"
-            install "rubik-cube"
         }
+
 
     }
 // 通常不用寫。只有 Chaquopy 找不到本機 Python 時才需要指定。
