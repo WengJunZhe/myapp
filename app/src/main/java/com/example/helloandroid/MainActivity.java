@@ -47,11 +47,15 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "CubeSolver";
 
-    private static final String[] FACE_KEYS  = {"U", "R", "F", "D", "L", "B"};
-    private static final String[] FACE_COLORS= {"W", "R", "G", "Y", "O", "B"};
+    private static final String[] FACE_KEYS  = {"U", "L", "F", "R", "B", "D"};
+    private static final String[] FACE_COLORS= {"W", "O", "G", "R", "B", "Y"};
     private static final String[] FACE_NAMES = {
-            "白色面 (U·上)", "紅色面 (R·右)", "綠色面 (F·前)",
-            "黃色面 (D·下)", "橙色面 (L·左)", "藍色面 (B·後)"
+            "白色面 (U·上)\n[橘色面對自己]",
+            "橘色面 (L·左)\n[黃色面對自己]",
+            "綠色面 (F·前)\n[黃色面對自己]",
+            "紅色面 (R·右)\n[黃色面對自己]",
+            "藍色面 (B·後)\n[黃色面對自己]",
+            "黃色面 (D·下)\n[綠色面對自己]"
     };
 
     private enum ScanState { IDLE, SCANNING, DONE }

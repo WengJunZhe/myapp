@@ -183,23 +183,50 @@ def detect_cube_face(image_bytes, expected_center_color=None):
     return buf.tobytes(), colors_9, confidence, error_msg
 
 
+def _rotate90(s):
+    # 012   630
+    # 345 -> 741
+    # 678   852
+    return s[6]+s[3]+s[0] + s[7]+s[4]+s[1] + s[8]+s[5]+s[2]
+
 def solve_cube(face_colors_dict):
     try:
         from rubik.cube import Cube
         from rubik.solve import Solver
         
-        # rubik-cube (pglass/cube) format mapping:
-        # Stickers 0–8: Up face
-        # Stickers 9–20: Top row of L, F, R, B
-        # Stickers 21–32: Middle row of L, F, R, B
-        # Stickers 33–44: Bottom row of L, F, R, B
-        # Stickers 45–53: Down face
-        u = face_colors_dict['U']
-        l = face_colors_dict['L']
-        f = face_colors_dict['F']
-        r = face_colors_dict['R']
-        b = face_colors_dict['B']
-        d = face_colors_dict['D']
+        # 將 Java HashMap 轉換為 Python dict
+        raw_faces = {}
+        for key in ['U', 'L', 'F', 'R', 'B', 'D']:
+            val = face_colors_dict.get(key)
+            raw_faces[key] = str(val) if val else "UUUUUUUUU"
+
+        # 建立顏色映射 (根據中心塊顏色決定該面代表哪個方位)
+        color_map = {raw_faces[k][4]: k for k in raw_faces}
+        
+        def to_face_str(s):
+            return "".join(color_map.get(c, 'U') for c in s)
+
+        # 根據您的拍攝姿勢進行旋轉校正：
+        # 1. 白色面 (U): 橘色面對自己 -> 需順時針轉 1 次校正
+        u = _rotate90(to_face_str(raw_faces['U']))
+        
+        # 2. 黃色面 (D): 綠色面對自己 -> 需旋轉 180 度 (轉 2 次) 校正
+        d = _rotate90(_rotate90(to_face_str(raw_faces['D'])))
+        
+        # 3. 側面 (L, F, R, B): 均以黃色為底，符合標準視角，不需旋轉
+        l = to_face_str(raw_faces['L'])
+        f = to_face_str(raw_faces['F'])
+        r = to_face_str(raw_faces['R'])
+        b = to_face_str(raw_faces['B'])
+
+        # 組合為 rubik-cube 要求的 54 字元格式 (U, L-F-R-B rows, D)
+        cube_str = (
+            u +
+            l[0:3] + f[0:3] + r[0:3] + b[0:3] +
+            l[3:6] + f[3:6] + r[3:6] + b[3:6] +
+            l[6:9] + f[6:9] + r[6:9] + b[6:9] +
+            d
+        )
         
         cube_str = (
             u +
