@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "CubeSolver";
 
     private static final String[] FACE_KEYS  = {"U", "R", "F", "D", "L", "B"};
+    private static final String[] FACE_COLORS= {"W", "R", "G", "Y", "O", "B"};
     private static final String[] FACE_NAMES = {
             "白色面 (U·上)", "紅色面 (R·右)", "綠色面 (F·前)",
             "黃色面 (D·下)", "橙色面 (L·左)", "藍色面 (B·後)"
@@ -203,6 +204,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // 確保沒有未識別的顏色 'U'
+        if (currentColors9 == null || currentColors9.contains("U")) {
+            Toast.makeText(this, "仍有色塊未辨識清楚，請調整角度", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         confirmedFaces.put(FACE_KEYS[currentFaceIndex], currentColors9);
         markDotDone(currentFaceIndex);
         currentFaceIndex++;
@@ -310,12 +317,14 @@ public class MainActivity extends AppCompatActivity {
                 image.close();
                 if (bytes == null) { isProcessing = false; return; }
 
-                PyObject pyResult = pyModule.callAttr("detect_cube_face", (Object) bytes);
+                String expectedColor = (state == ScanState.SCANNING) ? FACE_COLORS[currentFaceIndex] : null;
+                PyObject pyResult = pyModule.callAttr("detect_cube_face", (Object) bytes, expectedColor);
                 List<PyObject> items = pyResult.asList();
 
                 byte[]   pngBytes  = items.get(0).toJava(byte[].class);
                 PyObject pyColors  = items.get(1);
                 float    confidence = items.get(2).toJava(Float.class);
+                String   errorMsg   = items.get(3).toString();
 
                 String colors9 = null;
                 if (pyColors != null && !pyColors.toString().equals("None")) {
@@ -327,14 +336,36 @@ public class MainActivity extends AppCompatActivity {
                 final Bitmap bmp        = BitmapFactory.decodeByteArray(pngBytes, 0, pngBytes.length);
                 final String finalColors = colors9;
                 final float  finalConf   = confidence;
+                final String finalError  = errorMsg;
 
                 runOnUiThread(() -> {
                     if (bmp != null) resultView.setImageBitmap(bmp);
-                    if (finalColors != null) {
-                        currentColors9    = finalColors;
-                        currentConfidence = finalConf;
-                        confidenceBar.setProgress((int)(finalConf * 100));
+                    
+                    if (!finalError.isEmpty()) {
+                        // 如果有錯誤訊息（例如中心顏色不對），在上方卡片顯示
+                        tvFaceName.setText(finalError);
+                        tvFaceName.setTextColor(0xFFFF5722); // 橘紅色警告
+                        currentColors9 = null;
+                        currentConfidence = 0f;
+                        confidenceBar.setProgress(0);
+                    } else {
+                        // 正常掃描狀態
+                        tvFaceName.setTextColor(0xFFFFFFFF); // 白色字體
+                        if (state == ScanState.SCANNING) {
+                            tvFaceName.setText("第 " + (currentFaceIndex + 1) + "/6 面\n" + FACE_NAMES[currentFaceIndex]);
+                        }
+
+                        if (finalColors != null && finalConf > 0) {
+                            currentColors9    = finalColors;
+                            currentConfidence = finalConf;
+                            confidenceBar.setProgress((int)(finalConf * 100));
+                        } else {
+                            currentColors9 = null;
+                            currentConfidence = 0f;
+                            confidenceBar.setProgress(0);
+                        }
                     }
+
                     isProcessing = false;
                 });
             } catch (Exception e) {

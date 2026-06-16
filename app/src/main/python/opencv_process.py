@@ -42,11 +42,11 @@ def classify_color(bgr_patch):
     return 'U'
 
 
-def detect_cube_face(image_bytes):
+def detect_cube_face(image_bytes, expected_center_color=None):
     data = np.frombuffer(bytes(image_bytes), dtype=np.uint8)
     img = cv2.imdecode(data, cv2.IMREAD_COLOR)
     if img is None:
-        return _encode(None), None, 0.0
+        return _encode(None), None, 0.0, ""
 
     img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
     img = cv2.resize(img, (480, 640))
@@ -80,6 +80,7 @@ def detect_cube_face(image_bytes):
 
     colors_9   = None
     confidence = 0.0
+    error_msg  = ""
 
     if cube_quad is not None:
         dst_size  = 300
@@ -91,6 +92,8 @@ def detect_cube_face(image_bytes):
         colors_9 = []
         cell     = dst_size // 3
         ok_count = 0
+        center_color = "U"
+
         for row in range(3):
             for col in range(3):
                 cx = col * cell + cell // 2
@@ -108,15 +111,26 @@ def detect_cube_face(image_bytes):
                     ]
                     # 取這四個點的中位數
                     patch_bgr = np.median(samples, axis=0)
+                    center_color = classify_color(patch_bgr)
+                    color = center_color
                 else:
                     patch_bgr = _avg_patch(warped, cx, cy, 14)
+                    color = classify_color(patch_bgr)
 
-                color = classify_color(patch_bgr)
                 colors_9.append(color)
                 if color != 'U':
                     ok_count += 1
 
-        confidence = ok_count / 9.0
+        # 防呆機制：檢查中心塊顏色
+        if expected_center_color and center_color != "U" and center_color != expected_center_color:
+            # error_msg 保持中文，因為它會傳回 Java 端顯示在 TextView
+            error_msg = f"中心顏色錯誤！請掃描{_color_name_zh(expected_center_color)}面"
+            # 畫面上顯示的文字改為英文，避免問號
+            cv2.putText(overlay, "WRONG FACE!",
+                    (10, h-80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            confidence = 0.0
+        else:
+            confidence = ok_count / 9.0
 
         cv2.polylines(overlay, [cube_quad.astype(np.int32)], True, (0, 255, 0), 3)
 
@@ -141,10 +155,17 @@ def detect_cube_face(image_bytes):
                 cv2.circle(overlay, (int(pt_src[0]), int(pt_src[1])), 8, dot_color, -1)
                 cv2.circle(overlay, (int(pt_src[0]), int(pt_src[1])), 8, (0, 0, 0), 1)
 
+        if error_msg:
+             # 這裡之前重複繪製了錯誤訊息，已經整合到上方邏輯
+             pass
+
         cv2.putText(overlay, f"Confidence: {confidence*100:.0f}%",
                     (10, h-20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        cv2.putText(overlay, "".join(colors_9),
-                    (10, h-50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        # 只有在偵測到魔術方塊且沒有錯誤時才顯示顏色字串
+        if colors_9 and not error_msg:
+             cv2.putText(overlay, "".join(colors_9),
+                        (10, h-50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     else:
         margin    = 60
         guide_pts = np.array([
@@ -152,12 +173,12 @@ def detect_cube_face(image_bytes):
             [w-margin, h-margin], [margin, h-margin],
         ], dtype=np.int32)
         _draw_dashed_rect(overlay, guide_pts, (128, 128, 128), 2)
-        cv2.putText(overlay, "請對準魔術方塊",
+        cv2.putText(overlay, "Align the Cube",
                     (w//2-100, h//2), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (200, 200, 200), 2)
 
     result = cv2.addWeighted(img, 0.4, overlay, 0.6, 0)
     _, buf = cv2.imencode(".png", result)
-    return buf.tobytes(), colors_9, confidence
+    return buf.tobytes(), colors_9, confidence, error_msg
 
 
 def solve_cube(face_colors_dict):
@@ -244,6 +265,13 @@ def _color_bgr(name):
         'G': (0, 180, 0),     'B': (200, 0, 0),
         'U': (128, 128, 128),
     }.get(name, (128, 128, 128))
+
+def _color_name_zh(name):
+    return {
+        'W': "白色", 'Y': "黃色",
+        'R': "紅色", 'O': "橘色",
+        'G': "綠色", 'B': "藍色",
+    }.get(name, "未知")
 
 def _draw_dashed_rect(img, pts, color, thickness):
     n = len(pts)
