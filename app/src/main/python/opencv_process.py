@@ -3,12 +3,17 @@ import numpy as np
 import collections
 
 # Polyfill for rubik-solver compatibility with Python 3.10+
+import collections
 try:
     from collections import abc
-    collections.Iterable = abc.Iterable
-    collections.Mapping = abc.Mapping
-    collections.MutableMapping = abc.MutableMapping
-    collections.Callable = abc.Callable
+    if not hasattr(collections, 'Iterable'):
+        collections.Iterable = abc.Iterable
+    if not hasattr(collections, 'Mapping'):
+        collections.Mapping = abc.Mapping
+    if not hasattr(collections, 'MutableMapping'):
+        collections.MutableMapping = abc.MutableMapping
+    if not hasattr(collections, 'Callable'):
+        collections.Callable = abc.Callable
 except ImportError:
     pass
 
@@ -28,8 +33,12 @@ COLOR_RANGES = {
 def classify_color(bgr_patch):
     hsv = cv2.cvtColor(np.uint8([[bgr_patch]]), cv2.COLOR_BGR2HSV)[0][0]
     h, s, v = int(hsv[0]), int(hsv[1]), int(hsv[2])
-    if s < 50 and v > 160:
+    
+    # 增加對白色的判斷寬容度，並優先檢查白色
+    # 白色通常有極高的亮度 (V) 和較低的飽和度 (S)
+    if v > 150 and s < 60:
         return 'W'
+        
     for name, (lo, hi) in COLOR_RANGES.items():
         if name == 'W':
             continue
@@ -91,7 +100,22 @@ def detect_cube_face(image_bytes):
             for col in range(3):
                 cx = col * cell + cell // 2
                 cy = row * cell + cell // 2
-                patch_bgr = _avg_patch(warped, cx, cy, 14)
+                
+                # 特殊處理中心塊 (row=1, col=1)，避開可能的大面積 Logo
+                if row == 1 and col == 1:
+                    # 改用「環狀採樣」：在中心點周圍取 4 個角落點，避開正中央的 Logo
+                    offset = cell // 4
+                    samples = [
+                        _avg_patch(warped, cx - offset, cy - offset, 5),
+                        _avg_patch(warped, cx + offset, cy - offset, 5),
+                        _avg_patch(warped, cx - offset, cy + offset, 5),
+                        _avg_patch(warped, cx + offset, cy + offset, 5)
+                    ]
+                    # 取這四個點的中位數
+                    patch_bgr = np.median(samples, axis=0)
+                else:
+                    patch_bgr = _avg_patch(warped, cx, cy, 14)
+
                 color = classify_color(patch_bgr)
                 colors_9.append(color)
                 if color != 'U':
@@ -214,7 +238,9 @@ def _avg_patch(img, cx, cy, r=10):
     patch = img[y1:y2, x1:x2]
     if patch.size == 0:
         return np.array([128, 128, 128])
-    return patch.mean(axis=(0, 1))
+    # 使用中位數 (Median) 而非平均值 (Mean)
+    # 這樣可以有效忽略掉中心塊上的小面積 Logo (如 GAN 的藍色 Logo)
+    return np.median(patch, axis=(0, 1))
 
 def _color_bgr(name):
     return {
