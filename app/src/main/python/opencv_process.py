@@ -48,7 +48,9 @@ def detect_cube_face(image_bytes, expected_center_color=None):
     if img is None:
         return _encode(None), None, 0.0, ""
 
-    img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+    h_orig, w_orig = img.shape[:2]
+    if w_orig > h_orig:          # 只有真的拿到橫圖才旋轉
+        img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
     img = cv2.resize(img, (480, 640))
     h, w = img.shape[:2]
     overlay = img.copy()
