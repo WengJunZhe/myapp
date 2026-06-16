@@ -262,11 +262,6 @@ public class MainActivity extends AppCompatActivity {
 
         new Thread(() -> {
             try {
-                // 確保傳入的是一個包含所有 6 個面的 Map
-                if (confirmedFaces.size() < 6) {
-                    throw new Exception("尚未完成六面掃描");
-                }
-                
                 PyObject result = pyModule.callAttr("solve_cube", confirmedFaces);
                 List<PyObject> items = result.asList();
                 String solution = items.get(0).toString();
@@ -277,10 +272,9 @@ public class MainActivity extends AppCompatActivity {
                         tvSolution.setText("解法錯誤：\n" + errorMsg);
                         tvMoveCount.setText("請確認六面顏色是否正確");
                     } else {
-                        // Kociemba 傳回的是空格分隔的步驟
-                        String trimmed = solution.trim();
-                        int moves = trimmed.isEmpty() ? 0 : trimmed.split("\\s+").length;
-                        setResultUI(trimmed, moves);
+                        int moves = solution.trim().isEmpty() ? 0
+                                : solution.trim().split("\\s+").length;
+                        setResultUI(solution, moves);
                     }
                 });
             } catch (Exception e) {
