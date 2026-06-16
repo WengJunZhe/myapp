@@ -3,7 +3,6 @@ import numpy as np
 import collections
 
 # Polyfill for rubik-solver compatibility with Python 3.10+
-import collections
 try:
     from collections import abc
     collections.Iterable = abc.Iterable
