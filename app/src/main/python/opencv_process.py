@@ -6,14 +6,10 @@ import collections
 import collections
 try:
     from collections import abc
-    if not hasattr(collections, 'Iterable'):
-        collections.Iterable = abc.Iterable
-    if not hasattr(collections, 'Mapping'):
-        collections.Mapping = abc.Mapping
-    if not hasattr(collections, 'MutableMapping'):
-        collections.MutableMapping = abc.MutableMapping
-    if not hasattr(collections, 'Callable'):
-        collections.Callable = abc.Callable
+    collections.Iterable = abc.Iterable
+    collections.Mapping = abc.Mapping
+    collections.MutableMapping = abc.MutableMapping
+    collections.Callable = abc.Callable
 except ImportError:
     pass
 
