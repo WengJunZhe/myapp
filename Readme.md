@@ -11,7 +11,7 @@
 ## 3. 硬體與軟體環境
 *   **開發硬體**：PC / Laptop, Android 實體行動裝置。
 *   **開發軟體**：
-    *   **Android Studio**：Ladybug | 2024.2.1 或更新版本。
+    *   **Android Studio**：Pandas 4 | 2026.4 
     *   **Gradle**：8.0+。
     *   **Python**：3.10 (透過 Chaquopy 整合)。
 *   **主要程式語言**：Java (UI/CameraX控制), Python (影像處理/演算法)。
@@ -19,7 +19,7 @@
 ## 4. 安裝方式
 1.  **複製專案**：
     ```bash
-    git clone https://github.com/WengJunZhe/myapp.git
+    git clone https://github.com/WengJunZhe/myapp.git -b main
     ```
 2.  **開啟專案**：使用 Android Studio 開啟 `myapp` 資料夾。
 3.  **同步 Gradle**：點擊右上角 **Sync Project with Gradle Files** 圖示，系統會自動透過 Chaquopy 下載必要的 Python 環境與套件（NumPy, OpenCV）。
@@ -28,7 +28,7 @@
 
 ## 5. 執行方式
 1.  **啟動 App**：點擊畫面的「開始掃描」按鈕。
-2.  **掃描六面**：按照螢幕上方提示的順序（U、L、F、R、B、D）掃描方塊。
+2.  **掃描六面**：按照螢幕上方提示的順序掃描方塊。
     *   掃描時請確保方塊對準框內。
     *   確認左下角的顏色代碼與信心度，點擊「確認」進入下一面。
 3.  **獲取解法**：完成六面掃描後，系統自動跳轉至解法頁面。
