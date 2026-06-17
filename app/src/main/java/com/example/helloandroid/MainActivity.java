@@ -149,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
         btnStart.setVisibility(View.GONE);
         btnConfirm.setVisibility(View.VISIBLE);
         btnRescan.setVisibility(View.VISIBLE);
+        btnRescan.setText(faceIndex == 0 ? "重新掃描" : "回上一步");
         solutionPanel.setVisibility(View.GONE);
         hintCard.setVisibility(View.VISIBLE);
         confidenceBar.setVisibility(View.VISIBLE);
@@ -232,10 +233,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void rescanCurrentFace() {
+        if (state == ScanState.DONE) {
+            // 如果求解失敗後點重掃，回到最後一面 (Index 5)
+            state = ScanState.SCANNING;
+            currentFaceIndex = 5;
+            confirmedFaces.remove(FACE_KEYS[currentFaceIndex]);
+            dots[currentFaceIndex].setBackgroundResource(R.drawable.dot_inactive);
+            setScanningUI(currentFaceIndex);
+            startCamera(); // 重新開啟相機分析
+        } else if (currentFaceIndex > 0) {
+            // 掃描中點重掃，回到上一面
+            currentFaceIndex--;
+            confirmedFaces.remove(FACE_KEYS[currentFaceIndex]);
+            dots[currentFaceIndex].setBackgroundResource(R.drawable.dot_inactive);
+            setScanningUI(currentFaceIndex);
+        }
+
         currentColors9    = null;
         currentConfidence = 0f;
         runOnUiThread(() -> confidenceBar.setProgress(0));
-        Toast.makeText(this, "重新對準 " + FACE_NAMES[currentFaceIndex], Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "請重掃：" + FACE_NAMES[currentFaceIndex], Toast.LENGTH_SHORT).show();
     }
 
     private void resetAll() {
@@ -271,6 +288,9 @@ public class MainActivity extends AppCompatActivity {
                     if (!errorMsg.isEmpty()) {
                         tvSolution.setText("解法錯誤：\n" + errorMsg);
                         tvMoveCount.setText("請確認六面顏色是否正確");
+                        // 允許使用者點擊「重掃」回到最後一面檢查
+                        btnRescan.setVisibility(View.VISIBLE);
+                        btnRescan.setText("回上一步檢查");
                     } else {
                         int moves = solution.trim().isEmpty() ? 0
                                 : solution.trim().split("\\s+").length;
