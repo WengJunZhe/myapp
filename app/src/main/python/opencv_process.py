@@ -21,10 +21,10 @@ except ImportError:
 # ─────────────────────────────────────────────
 COLOR_RANGES = {
     'W': ([0,   0,  160], [180,  50, 255]),   # 白
-    'Y': ([20,  80,  80], [35,  255, 255]),   # 黃
-    'R': ([0,   80,  80], [10,  255, 255]),   # 紅（低段）
+    'O': ([10,  80,  80], [23,  255, 255]),   # 橙 (調廣一點減少誤判為黃)
+    'Y': ([24,  80,  80], [38,  255, 255]),   # 黃
+    'R': ([0,   80,  80], [9,   255, 255]),   # 紅（低段）
     'R2':([165, 80,  80], [180, 255, 255]),   # 紅（高段）
-    'O': ([10,  80,  80], [20,  255, 255]),   # 橙
     'G': ([40,  60,  60], [85,  255, 255]),   # 綠
     'B': ([90,  60,  60], [130, 255, 255]),   # 藍
 }
@@ -182,27 +182,30 @@ def solve_cube(face_map):
         u_face = _rotate_face_string(to_kociemba(raw['U']), 0) 
         r_face = _rotate_face_string(to_kociemba(raw['F']), 0) 
         f_face = _rotate_face_string(to_kociemba(raw['L']), 0) 
-        d_face = _rotate_face_string(to_kociemba(raw['D']), 2) 
+        d_face = _rotate_face_string(to_kociemba(raw['D']), 3)
         l_face = _rotate_face_string(to_kociemba(raw['B']), 0) 
         b_face = _rotate_face_string(to_kociemba(raw['R']), 0) 
 
         combined = u_face + r_face + f_face + d_face + l_face + b_face
         
-        # 驗證顏色數量
+        # 1. 優先驗證顏色數量
         counts = {c: combined.count(c) for c in "URFDLB"}
         if any(v != 9 for v in counts.values()):
-            err = "顏色分布異常: " + ", ".join([f"{k}:{v}" for k,v in counts.items()])
-            return "", err
+            return "", "顏色數量不正確"
 
         # 檢查是否已解好
         solved_string = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"
         if combined == solved_string:
             return "", "" # 0步
 
-        solution = kociemba.solve(combined)
-        return solution, ""
-    except Exception as e:
-        return "", f"求解失敗 (色塊位置可能不對): {str(e)}"
+        # 2. 嘗試求解，若失敗則回報拍攝順序錯誤
+        try:
+            solution = kociemba.solve(combined)
+            return solution, ""
+        except:
+            return "", "拍攝順序錯誤"
+    except Exception:
+        return "", "拍攝順序錯誤"
 
 
 # ── 工具函式 ──────────────────────────────────

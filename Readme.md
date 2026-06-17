@@ -60,6 +60,6 @@
 *   **執行速度**：影像辨識延遲 < 100ms，演算法計算時間 < 2s。
 
 ## 9. Team Members
-*   **劉顓賢**：負責 Android 框架開發、CameraX 整合、Git 版本控制。
+*   **劉顓賢**：負責 演算法、以及初期在 vscode 上面部屬初期架構。
 *   **林緯哲**：負責 Python 影像辨識邏輯優化、顏色閥值調校。
-*   **翁浚哲**：負責 Kociemba 演算法整合與座標系校正。
+*   **翁浚哲**：負責 初版 vscode 上功能整合到 Android Studio ，與座標系校正、Android 框架開發、CameraX 整合、Git 版本控制、UI架構。
