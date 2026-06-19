@@ -187,12 +187,12 @@ public class VirtualCubeView extends View {
         float h;
         
         switch (face) {
-            case 'U': h = 1.6f; addCirclePoints(arrowPoints, 'y', h, r, !prime, doubleMove); break;
-            case 'D': h = -1.6f; addCirclePoints(arrowPoints, 'y', h, r, prime, doubleMove); break;
-            case 'L': h = -1.6f; addCirclePoints(arrowPoints, 'x', h, r, !prime, doubleMove); break;
-            case 'R': h = 1.6f; addCirclePoints(arrowPoints, 'x', h, r, prime, doubleMove); break;
-            case 'F': h = 1.6f; addCirclePoints(arrowPoints, 'z', h, r, prime, doubleMove); break;
-            case 'B': h = -1.6f; addCirclePoints(arrowPoints, 'z', h, r, !prime, doubleMove); break;
+            case 'U': h = 1.6f; addCirclePoints(arrowPoints, 'y', h, r, prime, doubleMove); break;
+            case 'D': h = -1.6f; addCirclePoints(arrowPoints, 'y', h, r, !prime, doubleMove); break;
+            case 'L': h = -1.6f; addCirclePoints(arrowPoints, 'x', h, r, prime, doubleMove); break;
+            case 'R': h = 1.6f; addCirclePoints(arrowPoints, 'x', h, r, !prime, doubleMove); break;
+            case 'F': h = 1.6f; addCirclePoints(arrowPoints, 'z', h, r, !prime, doubleMove); break;
+            case 'B': h = -1.6f; addCirclePoints(arrowPoints, 'z', h, r, prime, doubleMove); break;
         }
 
         if (arrowPoints.isEmpty()) return;
