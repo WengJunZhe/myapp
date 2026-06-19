@@ -70,6 +70,9 @@ public class VirtualCubeView extends View {
         float y = event.getY();
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
                 lastX = x; lastY = y;
                 performClick();
                 break;
@@ -96,7 +99,7 @@ public class VirtualCubeView extends View {
 
         int width = getWidth();
         int height = getHeight();
-        float scale = Math.min(width, height) / 5f;
+        float scale = Math.min(width, height) / 7.5f;
         canvas.translate(width / 2f, height / 2f);
 
         List<Renderable> scene = new ArrayList<>();
@@ -163,7 +166,7 @@ public class VirtualCubeView extends View {
         boolean doubleMove = move.contains("2");
         float r = 2.4f, h;
         int steps = 24;
-        float sweep = (doubleMove ? 180f : 90f) * (prime ? 1 : -1);
+        float sweep = (doubleMove ? 180f : 90f) * (prime ? -1 : 1);
         float startAng = 30f;
         for (int i = 0; i < steps; i++) {
             if (i % 2 != 0) continue; 
@@ -171,12 +174,12 @@ public class VirtualCubeView extends View {
             float a2 = (float) Math.toRadians(startAng + sweep * (i+1) / steps);
             Point3D p1, p2;
             switch(face) {
-                case 'U': h=1.6f;  p1=new Point3D((float)Math.cos(a1)*r,h,-(float)Math.sin(a1)*r); p2=new Point3D((float)Math.cos(a2)*r,h,-(float)Math.sin(a2)*r); break;
-                case 'D': h=-1.6f; p1=new Point3D((float)Math.cos(a1)*r,h,(float)Math.sin(a1)*r); p2=new Point3D((float)Math.cos(a2)*r,h,(float)Math.sin(a2)*r); break;
+                case 'U': h=1.6f;  p1=new Point3D((float)Math.cos(a1)*r,h,(float)Math.sin(a1)*r); p2=new Point3D((float)Math.cos(a2)*r,h,(float)Math.sin(a2)*r); break;
+                case 'D': h=-1.6f; p1=new Point3D((float)Math.cos(a1)*r,h,-(float)Math.sin(a1)*r); p2=new Point3D((float)Math.cos(a2)*r,h,-(float)Math.sin(a2)*r); break;
                 case 'R': h=1.6f;  p1=new Point3D(h,(float)Math.cos(a1)*r,-(float)Math.sin(a1)*r); p2=new Point3D(h,(float)Math.cos(a2)*r,-(float)Math.sin(a2)*r); break;
                 case 'L': h=-1.6f; p1=new Point3D(h,(float)Math.cos(a1)*r,(float)Math.sin(a1)*r); p2=new Point3D(h,(float)Math.cos(a2)*r,(float)Math.sin(a2)*r); break;
-                case 'F': h=1.6f;  p1=new Point3D((float)Math.cos(a1)*r,(float)Math.sin(a1)*r,h); p2=new Point3D((float)Math.cos(a2)*r,(float)Math.sin(a2)*r,h); break;
-                case 'B': h=-1.6f; p1=new Point3D(-(float)Math.cos(a1)*r,(float)Math.sin(a1)*r,h); p2=new Point3D(-(float)Math.cos(a2)*r,(float)Math.sin(a2)*r,h); break;
+                case 'F': h=1.6f;  p1=new Point3D((float)Math.cos(a1)*r,-(float)Math.sin(a1)*r,h); p2=new Point3D((float)Math.cos(a2)*r,-(float)Math.sin(a2)*r,h); break;
+                case 'B': h=-1.6f; p1=new Point3D(-(float)Math.cos(a1)*r,-(float)Math.sin(a1)*r,h); p2=new Point3D(-(float)Math.cos(a2)*r,-(float)Math.sin(a2)*r,h); break;
                 default: continue;
             }
             scene.add(new ArrowSegment(p1, p2, i >= steps - 2));
@@ -228,8 +231,9 @@ public class VirtualCubeView extends View {
             canvas.drawPath(p, stickerPaint);
 
             int r = Color.red(color), g = Color.green(color), b = Color.blue(color);
-            float shade = 0.6f + 0.4f * Math.max(0, normalZ / 2f);
-            if (!active && currentMove != null) shade *= 0.65f; // 調整為 65% 亮度
+            // 基礎亮度調亮 10% (從 0.6 提升到 0.7)
+            float shade = 0.7f + 0.3f * Math.max(0, normalZ / 2f);
+            if (!active && currentMove != null) shade *= 0.65f; // 保持 65% 背景亮度
             stickerPaint.setColor(Color.rgb((int)(r*shade), (int)(g*shade), (int)(b*shade)));
 
             float shrink = 0.9f;
@@ -254,7 +258,7 @@ public class VirtualCubeView extends View {
             r1 = p1.rotate(yaw, pitch); r2 = p2.rotate(yaw, pitch);
             avgZ = (r1.z + r2.z) / 2f;
         }
-        @Override public float getZ() { return avgZ + 0.2f; }
+        @Override public float getZ() { return avgZ + 0.8f; } // 增加位移量，避免被傾斜的方塊邊角蓋住
         @Override public void draw(Canvas canvas, float scale) {
             float phase = (System.currentTimeMillis() % 800) / 800f * 40f;
             arrowPaint.setPathEffect(new DashPathEffect(new float[]{25, 15}, phase));
