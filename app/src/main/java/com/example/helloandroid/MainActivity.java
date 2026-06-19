@@ -37,6 +37,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,12 +71,19 @@ public class MainActivity extends AppCompatActivity {
     // UI
     private PreviewView previewView;
     private ImageView   resultView;
-    private TextView    tvFaceName, tvSolution, tvMoveCount;
+    private TextView    tvFaceName, tvSolution, tvMoveCount, tvStepInfo;
     private ProgressBar confidenceBar;
-    private Button      btnStart, btnConfirm, btnRescan, btnRestart;
+    private Button      btnStart, btnConfirm, btnRescan, btnRestart, btnPrevStep, btnNextStep;
     private CardView    hintCard;
     private ScrollView  solutionPanel;
+    private View        stepControls;
+    private VirtualCubeView virtualCubeView;
     private View[]      dots;
+
+    // Solution Steps
+    private List<String> solutionSteps = new ArrayList<>();
+    private int currentStepIndex = 0;
+    private String initialCubeString = null;
 
     // Camera / Python
     private Python   py;
@@ -104,6 +113,11 @@ public class MainActivity extends AppCompatActivity {
         btnConfirm    = findViewById(R.id.btnConfirm);
         btnRescan     = findViewById(R.id.btnRescan);
         btnRestart    = findViewById(R.id.btnRestart);
+        btnPrevStep   = findViewById(R.id.btnPrevStep);
+        btnNextStep   = findViewById(R.id.btnNextStep);
+        tvStepInfo    = findViewById(R.id.tvStepInfo);
+        stepControls  = findViewById(R.id.stepControls);
+        virtualCubeView = findViewById(R.id.virtualCubeView);
         hintCard      = findViewById(R.id.hintCard);
         solutionPanel = findViewById(R.id.solutionPanel);
         dots = new View[]{
@@ -118,6 +132,18 @@ public class MainActivity extends AppCompatActivity {
         btnConfirm.setOnClickListener(v -> confirmCurrentFace());
         btnRescan.setOnClickListener(v -> rescanCurrentFace());
         btnRestart.setOnClickListener(v -> resetAll());
+        btnPrevStep.setOnClickListener(v -> {
+            if (currentStepIndex > 0) {
+                currentStepIndex--;
+                updateStepUI();
+            }
+        });
+        btnNextStep.setOnClickListener(v -> {
+            if (currentStepIndex < solutionSteps.size()) {
+                currentStepIndex++;
+                updateStepUI();
+            }
+        });
 
         if (!Python.isStarted()) Python.start(new AndroidPlatform(this));
         py       = Python.getInstance();
@@ -140,6 +166,8 @@ public class MainActivity extends AppCompatActivity {
         solutionPanel.setVisibility(View.GONE);
         hintCard.setVisibility(View.VISIBLE);
         confidenceBar.setVisibility(View.VISIBLE);
+        virtualCubeView.setVisibility(View.GONE);
+        stepControls.setVisibility(View.GONE);
         tvFaceName.setText("按下「開始掃描」\n開始辨識魔術方塊");
         confidenceBar.setProgress(0);
         resetDots();
@@ -153,10 +181,12 @@ public class MainActivity extends AppCompatActivity {
         solutionPanel.setVisibility(View.GONE);
         hintCard.setVisibility(View.VISIBLE);
         confidenceBar.setVisibility(View.VISIBLE);
+        virtualCubeView.setVisibility(View.GONE);
+        stepControls.setVisibility(View.GONE);
         tvFaceName.setText("第 " + (faceIndex + 1) + "/6 面\n" + FACE_NAMES[faceIndex]);
     }
 
-    private void setResultUI(String solution, int moves) {
+    private void setResultUI(String solution, int moves, String combined) {
         solutionPanel.setVisibility(View.VISIBLE);
         hintCard.setVisibility(View.GONE);
         btnStart.setVisibility(View.GONE);
@@ -164,15 +194,54 @@ public class MainActivity extends AppCompatActivity {
         btnRescan.setVisibility(View.GONE);
         confidenceBar.setVisibility(View.GONE);
 
-        String[] steps = solution.trim().split("\\s+");
+        initialCubeString = combined;
+        solutionSteps.clear();
+        if (!solution.trim().isEmpty()) {
+            solutionSteps.addAll(Arrays.asList(solution.trim().split("\\s+")));
+        }
+        currentStepIndex = 0;
+
+        if (solutionSteps.isEmpty()) {
+            tvSolution.setText("方塊已復原！");
+            tvMoveCount.setText("");
+            virtualCubeView.setVisibility(View.GONE);
+            stepControls.setVisibility(View.GONE);
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < solutionSteps.size(); i++) {
+                sb.append(solutionSteps.get(i));
+                if ((i + 1) % 5 == 0 && i != solutionSteps.size() - 1) sb.append("\n");
+                else if (i != solutionSteps.size() - 1) sb.append("  ");
+            }
+            tvSolution.setText(sb.toString());
+            tvMoveCount.setText("共 " + moves + " 步");
+            
+            virtualCubeView.setVisibility(View.VISIBLE);
+            stepControls.setVisibility(View.VISIBLE);
+            updateStepUI();
+        }
+    }
+
+    private void updateStepUI() {
+        CubeState state = new CubeState(initialCubeString);
+        for (int i = 0; i < currentStepIndex; i++) {
+            state.applyMove(solutionSteps.get(i));
+        }
+        virtualCubeView.setCubeState(state);
+        
+        tvStepInfo.setText(currentStepIndex + " / " + solutionSteps.size());
+        
+        // Highlight current move in tvSolution
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < steps.length; i++) {
-            sb.append(steps[i]);
-            if ((i + 1) % 5 == 0 && i != steps.length - 1) sb.append("\n");
-            else if (i != steps.length - 1) sb.append("  ");
+        for (int i = 0; i < solutionSteps.size(); i++) {
+            if (i == currentStepIndex) sb.append("➔");
+            sb.append(solutionSteps.get(i));
+            if (i == currentStepIndex) sb.append(" ");
+            
+            if ((i + 1) % 5 == 0 && i != solutionSteps.size() - 1) sb.append("\n");
+            else if (i != solutionSteps.size() - 1) sb.append("  ");
         }
         tvSolution.setText(sb.toString());
-        tvMoveCount.setText("共 " + moves + " 步");
     }
 
     private void resetDots() {
@@ -283,6 +352,7 @@ public class MainActivity extends AppCompatActivity {
                 List<PyObject> items = result.asList();
                 String solution = items.get(0).toString();
                 String errorMsg = items.get(1).toString();
+                String combined = (items.size() > 2) ? items.get(2).toString() : "";
 
                 runOnUiThread(() -> {
                     if (!errorMsg.isEmpty()) {
@@ -291,10 +361,12 @@ public class MainActivity extends AppCompatActivity {
                         // 允許使用者點擊「重掃」回到最後一面檢查
                         btnRescan.setVisibility(View.VISIBLE);
                         btnRescan.setText("回上一步檢查");
+                        virtualCubeView.setVisibility(View.GONE);
+                        stepControls.setVisibility(View.GONE);
                     } else {
                         int moves = solution.trim().isEmpty() ? 0
                                 : solution.trim().split("\\s+").length;
-                        setResultUI(solution, moves);
+                        setResultUI(solution, moves, combined);
                     }
                 });
             } catch (Exception e) {
