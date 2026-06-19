@@ -229,6 +229,9 @@ public class MainActivity extends AppCompatActivity {
         }
         virtualCubeView.setCubeState(state);
         
+        String currentMove = (currentStepIndex < solutionSteps.size()) ? solutionSteps.get(currentStepIndex) : null;
+        virtualCubeView.setCurrentMove(currentMove);
+        
         tvStepInfo.setText(currentStepIndex + " / " + solutionSteps.size());
         
         // Highlight current move in tvSolution
