@@ -3,6 +3,7 @@ package com.example.helloandroid;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.util.AttributeSet;
@@ -22,11 +23,9 @@ public class VirtualCubeView extends View {
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     
-    // 調整初始角度：Yaw -45度讓 F(橘)在左，R(綠)在右
     private float yaw = -45f;
     private float pitch = -25f;
     private float lastX, lastY;
-    private float scale = 100f;
 
     public VirtualCubeView(Context context) {
         super(context);
@@ -40,14 +39,13 @@ public class VirtualCubeView extends View {
 
     private void init() {
         stickerPaint.setStyle(Paint.Style.FILL);
-        
         linePaint.setStyle(Paint.Style.STROKE);
         linePaint.setColor(Color.BLACK);
-        linePaint.setStrokeWidth(3f);
+        linePaint.setStrokeWidth(2f);
 
         arrowPaint.setStyle(Paint.Style.STROKE);
-        arrowPaint.setColor(0xFFFF00FF); // 螢光粉，保證清晰
-        arrowPaint.setStrokeWidth(12f);
+        arrowPaint.setColor(0xFF00FF00);
+        arrowPaint.setStrokeWidth(14f);
         arrowPaint.setStrokeCap(Paint.Cap.ROUND);
     }
 
@@ -72,19 +70,23 @@ public class VirtualCubeView extends View {
         float y = event.getY();
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
-                lastX = x;
-                lastY = y;
+                lastX = x; lastY = y;
                 performClick();
                 break;
             case MotionEvent.ACTION_MOVE:
-                yaw += (x - lastX) * 0.5f; 
+                // 修正 Yaw 旋轉方向以符合右手座標系與手勢直覺
+                yaw -= (x - lastX) * 0.5f; 
                 pitch += (y - lastY) * 0.5f;
-                lastX = x;
-                lastY = y;
+                lastX = x; lastY = y;
                 invalidate();
                 break;
         }
         return true;
+    }
+
+    interface Renderable {
+        float getZ();
+        void draw(Canvas canvas, float scale);
     }
 
     @Override
@@ -94,206 +96,176 @@ public class VirtualCubeView extends View {
 
         int width = getWidth();
         int height = getHeight();
-        scale = Math.min(width, height) / 5f;
+        float scale = Math.min(width, height) / 5f;
         canvas.translate(width / 2f, height / 2f);
 
-        List<Sticker> stickers = new ArrayList<>();
+        List<Renderable> scene = new ArrayList<>();
         char[] state = cubeState.getState();
 
-        // 核心修正：所有面的頂點順序改為 CCW (逆時針)，確保正面判定正確
-        
-        // U: 0-8 (White)
-        for (int i = 0; i < 9; i++) {
-            float x = -1f + (i % 3);
-            float z = -1f + (i / 3);
-            stickers.add(new Sticker(new Point3D[]{
-                    new Point3D(x - 0.5f, 1.5f, z + 0.5f), new Point3D(x + 0.5f, 1.5f, z + 0.5f),
-                    new Point3D(x + 0.5f, 1.5f, z - 0.5f), new Point3D(x - 0.5f, 1.5f, z - 0.5f)
-            }, state[i]));
-        }
-        // R: 9-17 (Green)
-        for (int i = 0; i < 9; i++) {
-            float z = 1f - (i % 3);
-            float y = 1f - (i / 3);
-            stickers.add(new Sticker(new Point3D[]{
-                    new Point3D(1.5f, y - 0.5f, z + 0.5f), new Point3D(1.5f, y - 0.5f, z - 0.5f),
-                    new Point3D(1.5f, y + 0.5f, z - 0.5f), new Point3D(1.5f, y + 0.5f, z + 0.5f)
-            }, state[9 + i]));
-        }
-        // F: 18-26 (Orange)
-        for (int i = 0; i < 9; i++) {
-            float x = -1f + (i % 3);
-            float y = 1f - (i / 3);
-            stickers.add(new Sticker(new Point3D[]{
-                    new Point3D(x - 0.5f, y - 0.5f, 1.5f), new Point3D(x + 0.5f, y - 0.5f, 1.5f),
-                    new Point3D(x + 0.5f, y + 0.5f, 1.5f), new Point3D(x - 0.5f, y + 0.5f, 1.5f)
-            }, state[18 + i]));
-        }
-        // D: 27-35 (Yellow)
-        for (int i = 0; i < 9; i++) {
-            float x = -1f + (i % 3);
-            float z = 1f - (i / 3);
-            stickers.add(new Sticker(new Point3D[]{
-                    new Point3D(x - 0.5f, -1.5f, z - 0.5f), new Point3D(x + 0.5f, -1.5f, z - 0.5f),
-                    new Point3D(x + 0.5f, -1.5f, z + 0.5f), new Point3D(x - 0.5f, -1.5f, z + 0.5f)
-            }, state[27 + i]));
-        }
-        // L: 36-44 (Blue)
-        for (int i = 0; i < 9; i++) {
-            float z = -1f + (i % 3);
-            float y = 1f - (i / 3);
-            stickers.add(new Sticker(new Point3D[]{
-                    new Point3D(-1.5f, y - 0.5f, z - 0.5f), new Point3D(-1.5f, y - 0.5f, z + 0.5f),
-                    new Point3D(-1.5f, y + 0.5f, z + 0.5f), new Point3D(-1.5f, y + 0.5f, z - 0.5f)
-            }, state[36 + i]));
-        }
-        // B: 45-53 (Red)
-        for (int i = 0; i < 9; i++) {
-            float x = 1f - (i % 3);
-            float y = 1f - (i / 3);
-            stickers.add(new Sticker(new Point3D[]{
-                    new Point3D(x + 0.5f, y - 0.5f, -1.5f), new Point3D(x - 0.5f, y - 0.5f, -1.5f),
-                    new Point3D(x - 0.5f, y + 0.5f, -1.5f), new Point3D(x + 0.5f, y + 0.5f, -1.5f)
-            }, state[45 + i]));
+        addStickers(scene, state);
+
+        if (currentMove != null && !currentMove.isEmpty()) {
+            addDashedArrowToScene(scene, currentMove);
         }
 
         float radYaw = (float) Math.toRadians(yaw);
         float radPitch = (float) Math.toRadians(pitch);
 
-        for (Sticker s : stickers) {
-            s.project(radYaw, radPitch);
+        for (Renderable r : scene) {
+            if (r instanceof Sticker) ((Sticker) r).project(radYaw, radPitch);
+            if (r instanceof ArrowSegment) ((ArrowSegment) r).project(radYaw, radPitch);
         }
 
-        Collections.sort(stickers, (o1, o2) -> Float.compare(o2.avgZ, o1.avgZ));
+        Collections.sort(scene, (o1, o2) -> Float.compare(o2.getZ(), o1.getZ()));
 
-        for (Sticker s : stickers) {
-            if (s.normalZ > 0) { // 現在 normalZ > 0 代表面向攝影機的正面
-                s.draw(canvas, stickerPaint, linePaint, scale);
-            }
-        }
+        for (Renderable r : scene) r.draw(canvas, scale);
 
-        if (currentMove != null && !currentMove.isEmpty()) {
-            drawMoveArrow(canvas, currentMove, radYaw, radPitch);
-        }
+        if (currentMove != null) postInvalidateOnAnimation();
     }
 
-    private void drawMoveArrow(Canvas canvas, String move, float radYaw, float radPitch) {
+    private void addStickers(List<Renderable> scene, char[] state) {
+        char moveFace = (currentMove != null && !currentMove.isEmpty()) ? currentMove.charAt(0) : ' ';
+        // U: 0-8, R: 9-17, F: 18-26, D: 27-35, L: 36-44, B: 45-53
+        for (int i = 0; i < 9; i++) scene.add(createSticker(state[i], -1+(i%3), 1.5f, -1+(i/3), 'U', moveFace));
+        for (int i = 0; i < 9; i++) scene.add(createSticker(state[9+i], 1.5f, 1-(i/3), 1-(i%3), 'R', moveFace));
+        for (int i = 0; i < 9; i++) scene.add(createSticker(state[18+i], -1+(i%3), 1-(i/3), 1.5f, 'F', moveFace));
+        for (int i = 0; i < 9; i++) scene.add(createSticker(state[27+i], -1+(i%3), -1.5f, 1-(i/3), 'D', moveFace));
+        for (int i = 0; i < 9; i++) scene.add(createSticker(state[36+i], -1.5f, 1-(i/3), -1+(i%3), 'L', moveFace));
+        for (int i = 0; i < 9; i++) scene.add(createSticker(state[45+i], 1-(i%3), 1-(i/3), -1.5f, 'B', moveFace));
+    }
+
+    private Sticker createSticker(char colorChar, float cx, float cy, float cz, char face, char moveFace) {
+        boolean active = false;
+        switch (moveFace) {
+            case 'U': active = (cy > 0.5f); break;
+            case 'D': active = (cy < -0.5f); break;
+            case 'L': active = (cx < -0.5f); break;
+            case 'R': active = (cx > 0.5f); break;
+            case 'F': active = (cz > 0.5f); break;
+            case 'B': active = (cz < -0.5f); break;
+        }
+        Point3D[] pts = new Point3D[4];
+        float g = 0.5f;
+        switch(face) {
+            case 'U': pts[0]=new Point3D(cx-g,cy,cz+g); pts[1]=new Point3D(cx+g,cy,cz+g); pts[2]=new Point3D(cx+g,cy,cz-g); pts[3]=new Point3D(cx-g,cy,cz-g); break;
+            case 'D': pts[0]=new Point3D(cx-g,cy,cz-g); pts[1]=new Point3D(cx+g,cy,cz-g); pts[2]=new Point3D(cx+g,cy,cz+g); pts[3]=new Point3D(cx-g,cy,cz+g); break;
+            case 'F': pts[0]=new Point3D(cx-g,cy-g,cz); pts[1]=new Point3D(cx+g,cy-g,cz); pts[2]=new Point3D(cx+g,cy+g,cz); pts[3]=new Point3D(cx-g,cy+g,cz); break;
+            case 'B': pts[0]=new Point3D(cx+g,cy-g,cz); pts[1]=new Point3D(cx-g,cy-g,cz); pts[2]=new Point3D(cx-g,cy+g,cz); pts[3]=new Point3D(cx+g,cy+g,cz); break;
+            case 'R': pts[0]=new Point3D(cx,cy-g,cz+g); pts[1]=new Point3D(cx,cy-g,cz-g); pts[2]=new Point3D(cx,cy+g,cz-g); pts[3]=new Point3D(cx,cy+g,cz+g); break;
+            case 'L': pts[0]=new Point3D(cx,cy-g,cz-g); pts[1]=new Point3D(cx,cy-g,cz+g); pts[2]=new Point3D(cx,cy+g,cz+g); pts[3]=new Point3D(cx,cy+g,cz-g); break;
+        }
+        return new Sticker(pts, colorChar, active);
+    }
+
+    private void addDashedArrowToScene(List<Renderable> scene, String move) {
         char face = move.charAt(0);
         boolean prime = move.contains("'");
         boolean doubleMove = move.contains("2");
-        
-        List<Point3D> arrowPoints = new ArrayList<>();
-        float r = 2.0f; 
-        float h;
-        
-        switch (face) {
-            case 'U': h = 1.6f; addCirclePoints(arrowPoints, 'y', h, r, prime, doubleMove); break;
-            case 'D': h = -1.6f; addCirclePoints(arrowPoints, 'y', h, r, !prime, doubleMove); break;
-            case 'L': h = -1.6f; addCirclePoints(arrowPoints, 'x', h, r, prime, doubleMove); break;
-            case 'R': h = 1.6f; addCirclePoints(arrowPoints, 'x', h, r, !prime, doubleMove); break;
-            case 'F': h = 1.6f; addCirclePoints(arrowPoints, 'z', h, r, !prime, doubleMove); break;
-            case 'B': h = -1.6f; addCirclePoints(arrowPoints, 'z', h, r, prime, doubleMove); break;
+        float r = 2.4f, h;
+        int steps = 24;
+        float sweep = (doubleMove ? 180f : 90f) * (prime ? 1 : -1);
+        float startAng = 30f;
+        for (int i = 0; i < steps; i++) {
+            if (i % 2 != 0) continue; 
+            float a1 = (float) Math.toRadians(startAng + sweep * i / steps);
+            float a2 = (float) Math.toRadians(startAng + sweep * (i+1) / steps);
+            Point3D p1, p2;
+            switch(face) {
+                case 'U': h=1.6f;  p1=new Point3D((float)Math.cos(a1)*r,h,-(float)Math.sin(a1)*r); p2=new Point3D((float)Math.cos(a2)*r,h,-(float)Math.sin(a2)*r); break;
+                case 'D': h=-1.6f; p1=new Point3D((float)Math.cos(a1)*r,h,(float)Math.sin(a1)*r); p2=new Point3D((float)Math.cos(a2)*r,h,(float)Math.sin(a2)*r); break;
+                case 'R': h=1.6f;  p1=new Point3D(h,(float)Math.cos(a1)*r,-(float)Math.sin(a1)*r); p2=new Point3D(h,(float)Math.cos(a2)*r,-(float)Math.sin(a2)*r); break;
+                case 'L': h=-1.6f; p1=new Point3D(h,(float)Math.cos(a1)*r,(float)Math.sin(a1)*r); p2=new Point3D(h,(float)Math.cos(a2)*r,(float)Math.sin(a2)*r); break;
+                case 'F': h=1.6f;  p1=new Point3D((float)Math.cos(a1)*r,(float)Math.sin(a1)*r,h); p2=new Point3D((float)Math.cos(a2)*r,(float)Math.sin(a2)*r,h); break;
+                case 'B': h=-1.6f; p1=new Point3D(-(float)Math.cos(a1)*r,(float)Math.sin(a1)*r,h); p2=new Point3D(-(float)Math.cos(a2)*r,(float)Math.sin(a2)*r,h); break;
+                default: continue;
+            }
+            scene.add(new ArrowSegment(p1, p2, i >= steps - 2));
         }
-
-        if (arrowPoints.isEmpty()) return;
-
-        Path path = new Path();
-        for (int i = 0; i < arrowPoints.size(); i++) {
-            Point3D p = arrowPoints.get(i).rotate(radYaw, radPitch);
-            if (i == 0) path.moveTo(p.x * scale, -p.y * scale);
-            else path.lineTo(p.x * scale, -p.y * scale);
-        }
-        canvas.drawPath(path, arrowPaint);
-        
-        if (arrowPoints.size() > 1) {
-            Point3D pLast = arrowPoints.get(arrowPoints.size() - 1).rotate(radYaw, radPitch);
-            Point3D pPrev = arrowPoints.get(arrowPoints.size() - 2).rotate(radYaw, radPitch);
-            drawArrowHead(canvas, pPrev.x * scale, -pPrev.y * scale, pLast.x * scale, -pLast.y * scale);
-        }
-    }
-
-    private void addCirclePoints(List<Point3D> points, char axis, float h, float r, boolean reverse, boolean doubleMove) {
-        float startAngle = 30f;
-        float sweepAngle = doubleMove ? 180f : 90f;
-        if (reverse) sweepAngle = -sweepAngle;
-        
-        int steps = 20;
-        for (int i = 0; i <= steps; i++) {
-            float angle = (float) Math.toRadians(startAngle + sweepAngle * i / steps);
-            float c = (float) Math.cos(angle) * r;
-            float s = (float) Math.sin(angle) * r;
-            if (axis == 'y') points.add(new Point3D(c, h, s));
-            else if (axis == 'x') points.add(new Point3D(h, c, s));
-            else if (axis == 'z') points.add(new Point3D(c, s, h));
-        }
-    }
-
-    private void drawArrowHead(Canvas canvas, float x1, float y1, float x2, float y2) {
-        float angle = (float) Math.atan2(y2 - y1, x2 - x1);
-        float headLen = 30f;
-        canvas.drawLine(x2, y2, x2 - headLen * (float) Math.cos(angle - Math.PI / 6), y2 - headLen * (float) Math.sin(angle - Math.PI / 6), arrowPaint);
-        canvas.drawLine(x2, y2, x2 - headLen * (float) Math.cos(angle + Math.PI / 6), y2 - headLen * (float) Math.sin(angle + Math.PI / 6), arrowPaint);
     }
 
     private static class Point3D {
         float x, y, z;
         Point3D(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
-        
         Point3D rotate(float yaw, float pitch) {
-            // Standard Rotation Formula
-            float x1 = x * (float) Math.cos(yaw) + z * (float) Math.sin(yaw);
-            float z1 = -x * (float) Math.sin(yaw) + z * (float) Math.cos(yaw);
+            // 標準右手座標系旋轉
+            float x1 = x * (float) Math.cos(yaw) - z * (float) Math.sin(yaw);
+            float z1 = x * (float) Math.sin(yaw) + z * (float) Math.cos(yaw);
             float y2 = y * (float) Math.cos(pitch) - z1 * (float) Math.sin(pitch);
             float z2 = y * (float) Math.sin(pitch) + z1 * (float) Math.cos(pitch);
             return new Point3D(x1, y2, z2);
         }
     }
 
-    private static class Sticker {
-        Point3D[] pts;
-        Point3D[] rotatedPts;
+    private class Sticker implements Renderable {
+        Point3D[] pts, rot;
         int color;
-        float avgZ;
-        float normalZ;
+        float avgZ, normalZ;
+        boolean active;
 
-        Sticker(Point3D[] pts, char c) {
+        Sticker(Point3D[] pts, char c, boolean active) {
             this.pts = pts;
             this.color = CubeState.getColorForChar(c);
-            this.rotatedPts = new Point3D[4];
+            this.rot = new Point3D[4];
+            this.active = active;
         }
 
         void project(float yaw, float pitch) {
             avgZ = 0;
-            for (int i = 0; i < 4; i++) {
-                rotatedPts[i] = pts[i].rotate(yaw, pitch);
-                avgZ += rotatedPts[i].z;
-            }
+            for (int i = 0; i < 4; i++) { rot[i] = pts[i].rotate(yaw, pitch); avgZ += rot[i].z; }
             avgZ /= 4f;
-            
-            // 2D Winding calculation
-            float v1x = rotatedPts[1].x - rotatedPts[0].x;
-            float v1y = rotatedPts[1].y - rotatedPts[0].y;
-            float v2x = rotatedPts[2].x - rotatedPts[0].x;
-            float v2y = rotatedPts[2].y - rotatedPts[0].y;
-            normalZ = v1x * v2y - v1y * v2x;
+            // 配合 Android -Y 投影的 2D 法向判定
+            normalZ = (rot[1].x - rot[0].x) * (rot[2].y - rot[0].y) - (rot[1].y - rot[0].y) * (rot[2].x - rot[0].x);
         }
 
-        void draw(Canvas canvas, Paint fill, Paint stroke, float scale) {
-            Path path = new Path();
-            path.moveTo(rotatedPts[0].x * scale, -rotatedPts[0].y * scale);
+        @Override public float getZ() { return avgZ; }
+        @Override public void draw(Canvas canvas, float scale) {
+            if (normalZ <= 0) return;
+            stickerPaint.setColor(0xFF111111);
+            Path p = new Path();
+            p.moveTo(rot[0].x * scale, -rot[0].y * scale);
+            for (int i = 1; i < 4; i++) p.lineTo(rot[i].x * scale, -rot[i].y * scale);
+            p.close();
+            canvas.drawPath(p, stickerPaint);
+
+            int r = Color.red(color), g = Color.green(color), b = Color.blue(color);
+            float shade = 0.6f + 0.4f * Math.max(0, normalZ / 2f);
+            if (!active && currentMove != null) shade *= 0.65f; // 調整為 65% 亮度
+            stickerPaint.setColor(Color.rgb((int)(r*shade), (int)(g*shade), (int)(b*shade)));
+
+            float shrink = 0.9f;
+            Path pSmall = new Path();
+            float midX = (rot[0].x + rot[2].x) / 2f;
+            float midY = (rot[0].y + rot[2].y) / 2f;
+            pSmall.moveTo((midX + (rot[0].x - midX) * shrink) * scale, -(midY + (rot[0].y - midY) * shrink) * scale);
             for (int i = 1; i < 4; i++) {
-                path.lineTo(rotatedPts[i].x * scale, -rotatedPts[i].y * scale);
+                pSmall.lineTo((midX + (rot[i].x - midX) * shrink) * scale, -(midY + (rot[i].y - midY) * shrink) * scale);
             }
-            path.close();
-            
-            int r = Color.red(color);
-            int g = Color.green(color);
-            int b = Color.blue(color);
-            float shading = 0.8f + 0.2f * Math.max(0, normalZ / 2f); 
-            fill.setColor(Color.rgb((int)(r*shading), (int)(g*shading), (int)(b*shading)));
-            
-            canvas.drawPath(path, fill);
-            canvas.drawPath(path, stroke);
+            pSmall.close();
+            canvas.drawPath(pSmall, stickerPaint);
+        }
+    }
+
+    private class ArrowSegment implements Renderable {
+        Point3D p1, p2, r1, r2;
+        boolean head;
+        float avgZ;
+        ArrowSegment(Point3D p1, Point3D p2, boolean head) { this.p1 = p1; this.p2 = p2; this.head = head; }
+        void project(float yaw, float pitch) {
+            r1 = p1.rotate(yaw, pitch); r2 = p2.rotate(yaw, pitch);
+            avgZ = (r1.z + r2.z) / 2f;
+        }
+        @Override public float getZ() { return avgZ + 0.2f; }
+        @Override public void draw(Canvas canvas, float scale) {
+            float phase = (System.currentTimeMillis() % 800) / 800f * 40f;
+            arrowPaint.setPathEffect(new DashPathEffect(new float[]{25, 15}, phase));
+            canvas.drawLine(r1.x * scale, -r1.y * scale, r2.x * scale, -r2.y * scale, arrowPaint);
+            if (head) {
+                arrowPaint.setPathEffect(null);
+                float x1 = r1.x * scale, y1 = -r1.y * scale, x2 = r2.x * scale, y2 = -r2.y * scale;
+                float ang = (float) Math.atan2(y2 - y1, x2 - x1);
+                canvas.drawLine(x2, y2, x2 - 35f*(float)Math.cos(ang-0.5f), y2 - 35f*(float)Math.sin(ang-0.5f), arrowPaint);
+                canvas.drawLine(x2, y2, x2 - 35f*(float)Math.cos(ang+0.5f), y2 - 35f*(float)Math.sin(ang+0.5f), arrowPaint);
+            }
         }
     }
 }
