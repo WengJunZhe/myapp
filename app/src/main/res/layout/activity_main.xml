@@ -201,6 +201,44 @@
                 android:padding="16dp"
                 android:background="#22FFFFFF" />
 
+            <com.example.helloandroid.VirtualCubeView
+                android:id="@+id/virtualCubeView"
+                android:layout_width="match_parent"
+                android:layout_height="250dp"
+                android:layout_marginTop="8dp" />
+
+            <LinearLayout
+                android:id="@+id/stepControls"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/btnPrevStep"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="上一步"
+                    android:layout_marginEnd="16dp" />
+
+                <TextView
+                    android:id="@+id/tvStepInfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 / 0"
+                    android:textColor="#FFFFFF" />
+
+                <Button
+                    android:id="@+id/btnNextStep"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="下一步"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/tvMoveCount"
                 android:layout_width="wrap_content"
@@ -214,7 +252,8 @@
                 android:id="@+id/btnRestart"
                 android:layout_width="wrap_content"
                 android:layout_height="52dp"
-                android:layout_marginTop="32dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="40dp"
                 android:paddingHorizontal="32dp"
                 android:text="重新掃描"
                 android:textSize="16sp"

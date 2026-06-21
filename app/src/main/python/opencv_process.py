@@ -201,11 +201,11 @@ def solve_cube(face_map):
         # 2. 嘗試求解，若失敗則回報拍攝順序錯誤
         try:
             solution = kociemba.solve(combined)
-            return solution, ""
+            return solution, "", combined
         except:
-            return "", "拍攝順序錯誤"
+            return "", "拍攝順序錯誤", ""
     except Exception:
-        return "", "拍攝順序錯誤"
+        return "", "拍攝順序錯誤", ""
 
 
 # ── 工具函式 ──────────────────────────────────
